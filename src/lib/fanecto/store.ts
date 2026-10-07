@@ -88,11 +88,19 @@ interface FanectoActions {
   startRentalConversation: (propertyId: string) => string;
   bookAndPayInspection: (propertyId: string, inspectorId: string) => string;
   scheduleInspection: (inspectionId: string, iso: string) => void;
+  acceptInspection: (inspectionId: string) => void;
+  declineInspection: (inspectionId: string) => void;
+  approvePropertyAccess: (inspectionId: string) => void;
+  declinePropertyAccess: (inspectionId: string) => void;
+  suggestInspectionTime: (inspectionId: string, iso: string) => void;
+  startInspection: (inspectionId: string) => void;
+  saveInspectionReportDraft: (inspectionId: string, report: NonNullable<Inspection["report"]>) => void;
   completeInspection: (inspectionId: string, report: NonNullable<Inspection["report"]>) => void;
   setInspectionStatus: (inspectionId: string, status: Inspection["status"]) => void;
   payRent: (propertyId: string) => { ok: boolean; error?: string; paymentId?: string };
   createRoommateListing: (listing: Omit<RoommateListing, "id" | "createdAt" | "status" | "creatorId">) => string;
   payRoommateConnection: (listingId: string) => { ok: boolean; error?: string };
+  rateInspection: (inspectionId: string, rating: number, comment?: string) => void;
   submitReview: (promptId: string, rating: number, text: string) => void;
   dismissPrompt: (promptId: string) => void;
   submitVerification: (userId: string) => void;
@@ -266,9 +274,12 @@ export const useFanecto = createWithEqualityFn<FanectoState & FanectoActions>()(
           seekerId: user.id,
           inspectorId,
           fee,
-          status: "paid",
+          status: "awaiting_confirmation",
           paidAt: now(),
           chatUnlocked: true,
+          reportStatus: "not_submitted",
+          payoutStatus: "pending",
+          propertyAuthorizationStatus: "not_required",
           createdAt: now(),
         };
         const payment: Payment = {
@@ -325,6 +336,212 @@ export const useFanecto = createWithEqualityFn<FanectoState & FanectoActions>()(
         });
         return inspection.id;
       },
+
+      acceptInspection: (inspectionId) =>
+        set((st) => {
+          const ins = st.inspections.find((i) => i.id === inspectionId);
+          if (!ins) return st;
+          const property = st.properties.find((p) => p.id === ins.propertyId);
+          const notifyOwners = [property?.landlordId, property?.agentId].filter(Boolean) as string[];
+          return {
+            inspections: st.inspections.map((i) =>
+              i.id === inspectionId
+                ? {
+                    ...i,
+                    status: "awaiting_property_authorization",
+                    propertyAuthorizationStatus: "pending",
+                    scheduledAt: i.scheduledAt ?? now(),
+                  }
+                : i,
+            ),
+            notifications: [
+              {
+                id: nid("n"),
+                recipientId: ins.seekerId,
+                type: "inspection_update",
+                title: "Inspector accepted — awaiting property access",
+                body: "The inspector accepted. The landlord or authorized agent must approve access before the visit is confirmed.",
+                href: "/inspections",
+                read: false,
+                createdAt: now(),
+              },
+              ...notifyOwners.map((rid) => {
+                const owner = st.users.find((u) => u.id === rid);
+                return {
+                  id: nid("n"),
+                  recipientId: rid,
+                  type: "inspection_update" as const,
+                  title: "Inspection access requested",
+                  body: "An inspector is requesting access to inspect one of your listings.",
+                  href: owner?.role === "agent" ? "/agent/inspections" : "/landlord/inspections",
+                  read: false,
+                  createdAt: now(),
+                };
+              }),
+              ...st.notifications,
+            ],
+          };
+        }),
+      declineInspection: (inspectionId) =>
+        set((st) => {
+          const ins = st.inspections.find((i) => i.id === inspectionId);
+          if (!ins) return st;
+          return {
+            inspections: st.inspections.map((i) =>
+              i.id === inspectionId
+                ? { ...i, status: "declined", payoutStatus: "not_applicable" as const }
+                : i,
+            ),
+            notifications: [
+              {
+                id: nid("n"),
+                recipientId: ins.seekerId,
+                type: "inspection_update",
+                title: "Inspection declined",
+                body: "The inspector cannot take this appointment. Payment status is under review.",
+                href: "/inspections",
+                read: false,
+                createdAt: now(),
+              },
+              ...st.notifications,
+            ],
+          };
+        }),
+      approvePropertyAccess: (inspectionId) =>
+        set((st) => {
+          const ins = st.inspections.find((i) => i.id === inspectionId);
+          if (!ins) return st;
+          return {
+            inspections: st.inspections.map((i) =>
+              i.id === inspectionId
+                ? {
+                    ...i,
+                    status: "confirmed",
+                    propertyAuthorizationStatus: "approved" as const,
+                  }
+                : i,
+            ),
+            notifications: [
+              {
+                id: nid("n"),
+                recipientId: ins.seekerId,
+                type: "inspection_update",
+                title: "Inspection confirmed",
+                body: "Property access was authorized. Your inspection is confirmed.",
+                href: "/inspections",
+                read: false,
+                createdAt: now(),
+              },
+              {
+                id: nid("n"),
+                recipientId: ins.inspectorId,
+                type: "inspection_update",
+                title: "Property access authorized",
+                body: "You may proceed with the confirmed inspection appointment.",
+                href: `/inspector/inspections/${inspectionId}`,
+                read: false,
+                createdAt: now(),
+              },
+              ...st.notifications,
+            ],
+          };
+        }),
+      declinePropertyAccess: (inspectionId) =>
+        set((st) => {
+          const ins = st.inspections.find((i) => i.id === inspectionId);
+          if (!ins) return st;
+          return {
+            inspections: st.inspections.map((i) =>
+              i.id === inspectionId
+                ? {
+                    ...i,
+                    status: "access_declined",
+                    propertyAuthorizationStatus: "declined" as const,
+                    payoutStatus: "not_applicable" as const,
+                  }
+                : i,
+            ),
+            notifications: [
+              {
+                id: nid("n"),
+                recipientId: ins.seekerId,
+                type: "inspection_update",
+                title: "Inspection access declined",
+                body: "Property access was not authorized. This inspection cannot proceed.",
+                href: "/inspections",
+                read: false,
+                createdAt: now(),
+              },
+              {
+                id: nid("n"),
+                recipientId: ins.inspectorId,
+                type: "inspection_update",
+                title: "Property access declined",
+                body: "The landlord or agent did not authorize access for this inspection.",
+                href: `/inspector/inspections/${inspectionId}`,
+                read: false,
+                createdAt: now(),
+              },
+              ...st.notifications,
+            ],
+          };
+        }),
+      suggestInspectionTime: (inspectionId, iso) =>
+        set((st) => {
+          const ins = st.inspections.find((i) => i.id === inspectionId);
+          if (!ins) return st;
+          return {
+            inspections: st.inspections.map((i) =>
+              i.id === inspectionId
+                ? {
+                    ...i,
+                    suggestedScheduledAt: iso,
+                    propertyAuthorizationStatus: "reschedule_suggested" as const,
+                    status: "awaiting_property_authorization",
+                  }
+                : i,
+            ),
+            notifications: [
+              {
+                id: nid("n"),
+                recipientId: ins.inspectorId,
+                type: "inspection_update",
+                title: "Another time suggested",
+                body: "The property owner suggested a different inspection time.",
+                href: `/inspector/inspections/${inspectionId}`,
+                read: false,
+                createdAt: now(),
+              },
+              {
+                id: nid("n"),
+                recipientId: ins.seekerId,
+                type: "inspection_update",
+                title: "Inspection time suggestion",
+                body: "A different inspection time was suggested.",
+                href: "/inspections",
+                read: false,
+                createdAt: now(),
+              },
+              ...st.notifications,
+            ],
+          };
+        }),
+      startInspection: (inspectionId) =>
+        set((st) => ({
+          inspections: st.inspections.map((i) =>
+            i.id === inspectionId && (i.status === "confirmed" || i.status === "scheduled")
+              ? { ...i, status: "in_progress" }
+              : i,
+          ),
+        })),
+      saveInspectionReportDraft: (inspectionId, report) =>
+        set((st) => ({
+          inspections: st.inspections.map((i) =>
+            i.id === inspectionId
+              ? { ...i, report: { ...report, isDraft: true }, reportStatus: "draft" as const }
+              : i,
+          ),
+        })),
       scheduleInspection: (inspectionId, iso) =>
         set((s) => ({
           inspections: s.inspections.map((i) =>
@@ -354,7 +571,16 @@ export const useFanecto = createWithEqualityFn<FanectoState & FanectoActions>()(
                 ? {
                     ...i,
                     status: "report_ready",
-                    report: { ...report, disclaimer: INSPECTION_DISCLAIMER, completedAt: now() },
+                    reportStatus: "ready" as const,
+                    payoutStatus: "processing" as const,
+                    submittedAt: now(),
+                    completedAt: now(),
+                    report: {
+                      ...report,
+                      isDraft: false,
+                      disclaimer: INSPECTION_DISCLAIMER,
+                      completedAt: now(),
+                    },
                   }
                 : i,
             ),
@@ -517,6 +743,24 @@ export const useFanecto = createWithEqualityFn<FanectoState & FanectoActions>()(
         });
         return { ok: true };
       },
+      rateInspection: (inspectionId, rating, comment) =>
+        set((st) => {
+          if (rating < 1 || rating > 5) return st;
+          const ins = st.inspections.find((i) => i.id === inspectionId);
+          if (!ins || ins.ratingSubmitted) return st;
+          return {
+            inspections: st.inspections.map((i) =>
+              i.id === inspectionId
+                ? {
+                    ...i,
+                    clientRating: rating,
+                    ratingSubmitted: true,
+                    ratingComment: comment?.trim() || undefined,
+                  }
+                : i,
+            ),
+          };
+        }),
       submitReview: (promptId, rating, text) => {
         const s = get();
         const prompt = s.reviewPrompts.find((p) => p.id === promptId);

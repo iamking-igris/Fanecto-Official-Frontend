@@ -1,107 +1,24 @@
-import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowRight, Building2, CalendarDays, Clock3, MapPin, MessageSquareText, ShieldCheck, Star } from "lucide-react";
+import { useMemo, useState } from "react";
+import { toast } from "sonner";
 import { EmptyState } from "@/components/fanecto/empty-state";
-import { NotificationCenter } from "@/components/fanecto/notification-center";
 import { PageHeader } from "@/components/fanecto/page-header";
+import { Stars } from "@/components/fanecto/stars";
 import { InspectionPill } from "@/components/fanecto/status-pill";
 import { RoleGate } from "@/components/layout/role-gate";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { formatDate, formatDateTime, formatNaira, initials } from "@/lib/fanecto/format";
+import { Textarea } from "@/components/ui/textarea";
+import { formatDateTime, formatNaira, inspectionSplit } from "@/lib/fanecto/format";
 import { useCurrentFanectoUser, useFanecto } from "@/lib/fanecto/store";
-import type { Inspection } from "@/lib/fanecto/types";
+import { INSPECTION_DISCLAIMER } from "@/lib/fanecto/types";
 import { cn } from "@/lib/utils";
 import { z } from "zod";
 
-const searchSchema = z.object({ id: z.string().optional() });
-type InspectionFilter = "all" | "pending" | "upcoming" | "completed" | "cancelled";
-
-const FILTERS: { value: InspectionFilter; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "pending", label: "Pending" },
-  { value: "upcoming", label: "Upcoming" },
-  { value: "completed", label: "Completed" },
-  { value: "cancelled", label: "Cancelled" },
-];
-
-function getInspectionFilter(status: Inspection["status"]): InspectionFilter {
-  switch (status) {
-    case "requested":
-    case "payment_pending":
-      return "pending";
-    case "paid":
-    case "scheduled":
-    case "in_progress":
-      return "upcoming";
-    case "completed":
-    case "report_ready":
-    case "settled":
-      return "completed";
-    case "cancelled":
-    case "no_show":
-    case "disputed":
-      return "cancelled";
-    default:
-      return "all";
-  }
-}
-
-function getInspectionMeta(inspection: Inspection) {
-  switch (inspection.status) {
-    case "requested":
-    case "payment_pending":
-      return {
-        label: "Pending payment",
-        message: "Your inspection payment is required before the inspection can be confirmed.",
-        cta: "Pay inspection fee",
-        to: "/payments",
-      };
-    case "paid":
-      return {
-        label: inspection.scheduledAt ? "Confirmed" : "Awaiting confirmation",
-        message: inspection.scheduledAt
-          ? "Your inspection is booked and the inspector has been assigned."
-          : "Your payment has been received. We’re waiting for the inspection appointment to be confirmed.",
-        cta: "View inspection",
-        to: `/inspections/${inspection.id}`,
-      };
-    case "scheduled":
-    case "in_progress":
-      return {
-        label: "Confirmed",
-        message: "Your appointment is confirmed. The inspector is ready to meet you on site.",
-        cta: "View inspection",
-        to: `/inspections/${inspection.id}`,
-      };
-    case "completed":
-    case "report_ready":
-    case "settled":
-      return {
-        label: "Completed",
-        message: "This inspection has been completed and the report is available.",
-        cta: "View inspection",
-        to: `/inspections/${inspection.id}`,
-      };
-    case "cancelled":
-    case "no_show":
-    case "disputed":
-      return {
-        label: "Cancelled",
-        message: inspection.status === "disputed" ? "This inspection was closed because the appointment could not be confirmed." : "This inspection was cancelled. Please review the appointment details for more information.",
-        cta: "View inspection",
-        to: `/inspections/${inspection.id}`,
-      };
-    default:
-      return {
-        label: "Review",
-        message: "Please check the inspection details for the latest status.",
-        cta: "View inspection",
-        to: `/inspections/${inspection.id}`,
-      };
-  }
-}
+const searchSchema = z.object({
+  id: z.string().optional(),
+  view: z.enum(["detail", "report"]).optional(),
+});
 
 export const Route = createFileRoute("/inspections")({
   component: InspectionsRoute,
@@ -116,39 +33,53 @@ function InspectionsRoute() {
   );
 }
 
+type Filter = "all" | "pending" | "upcoming" | "completed" | "cancelled";
+
 function InspectionsPage() {
-  const { id } = Route.useSearch();
+  const { id, view } = Route.useSearch();
   const user = useCurrentFanectoUser();
-  const inspections: Inspection[] = useFanecto((s) => s.inspections.filter((i) => i.seekerId === user?.id));
+  const [filter, setFilter] = useState<Filter>("all");
+  const inspections = useFanecto((s) => s.inspections.filter((i) => i.seekerId === user?.id));
   const properties = useFanecto((s) => s.properties);
   const users = useFanecto((s) => s.users);
-  const conversations = useFanecto((s) => s.conversations.filter((c) => c.context === "inspection"));
-  const [filter, setFilter] = useState<InspectionFilter>("all");
-  const [selectedId, setSelectedId] = useState<string | null>(id ?? inspections[0]?.id ?? null);
+  const conversations = useFanecto((s) => s.conversations);
 
-  const filteredInspections: Inspection[] = useMemo(
-    () =>
-      inspections.filter((inspection) => {
-        if (filter === "all") return true;
-        return getInspectionFilter(inspection.status) === filter;
-      }),
-    [filter, inspections],
-  );
+  const filtered = useMemo(() => {
+    return inspections.filter((i) => {
+      if (filter === "pending")
+        return [
+          "payment_pending",
+          "requested",
+          "awaiting_confirmation",
+          "paid",
+          "awaiting_property_authorization",
+        ].includes(i.status);
+      if (filter === "upcoming") return ["confirmed", "scheduled", "in_progress"].includes(i.status);
+      if (filter === "completed")
+        return ["report_ready", "completed", "settlement_pending", "settled"].includes(i.status);
+      if (filter === "cancelled")
+        return ["declined", "access_declined", "cancelled", "disputed"].includes(i.status);
+      return true;
+    });
+  }, [inspections, filter]);
 
-  useEffect(() => {
-    if (!filteredInspections.length) {
-      setSelectedId(null);
-      return;
-    }
-    const stillVisible = filteredInspections.some((inspection) => inspection.id === selectedId);
-    if (!stillVisible) {
-      setSelectedId(filteredInspections[0].id);
-    }
-  }, [filteredInspections, selectedId]);
+  const selected =
+    inspections.find((i) => i.id === id) ?? filtered[0] ?? inspections[0];
+  const property = properties.find((p) => p.id === selected?.propertyId);
+  const inspector = users.find((u) => u.id === selected?.inspectorId);
+  const conv = conversations.find((c) => c.inspectionId === selected?.id);
+  const hasReport =
+    !!selected?.report &&
+    ["report_ready", "completed", "settlement_pending", "settled"].includes(selected.status);
+  const showReport = view === "report" && hasReport && selected;
 
-  const selected = filteredInspections.find((inspection) => inspection.id === selectedId) ?? filteredInspections[0] ?? inspections[0];
-  const property = properties.find((item) => item.id === selected?.propertyId);
-  const inspector = users.find((item) => item.id === selected?.inspectorId);
+  const tabs: { id: Filter; label: string }[] = [
+    { id: "all", label: "All" },
+    { id: "pending", label: "Pending" },
+    { id: "upcoming", label: "Upcoming" },
+    { id: "completed", label: "Completed" },
+    { id: "cancelled", label: "Cancelled" },
+  ];
 
   if (!inspections.length) {
     return (
@@ -156,29 +87,29 @@ function InspectionsPage() {
         <PageHeader
           kicker="Inspections"
           title="Inspections"
-          description="Track your property inspections, appointments and inspection payments."
-          actions={
-            <div className="flex items-center gap-2">
-              <NotificationCenter />
-              {user ? (
-                <Avatar className="size-8">
-                  {user.avatar ? <AvatarImage src={user.avatar} alt={user.displayName} /> : null}
-                  <AvatarFallback>{initials(user.displayName)}</AvatarFallback>
-                </Avatar>
-              ) : null}
-            </div>
-          }
+          description="Track your property inspections and view completed inspection reports."
         />
         <EmptyState
           title="No inspections yet"
-          body="When you request an inspection for a property, it will appear here."
+          body="Open a home and book an inspector. Chat stays locked until payment succeeds. The report is physical observation — not a title search."
           action={
             <Button asChild>
-              <Link to="/properties">Explore apartments</Link>
+              <Link to="/properties">Find a home</Link>
             </Button>
           }
         />
       </div>
+    );
+  }
+
+  if (showReport && selected && property) {
+    return (
+      <ReportView
+        inspectionId={selected.id}
+        onBack={() => {
+          /* navigation via Link */
+        }}
+      />
     );
   }
 
@@ -187,191 +118,476 @@ function InspectionsPage() {
       <PageHeader
         kicker="Inspections"
         title="Inspections"
-        description="Track your property inspections, appointments and inspection payments."
-        actions={
-          <div className="flex items-center gap-2">
-            <NotificationCenter />
-            {user ? (
-              <Avatar className="size-8">
-                {user.avatar ? <AvatarImage src={user.avatar} alt={user.displayName} /> : null}
-                <AvatarFallback>{initials(user.displayName)}</AvatarFallback>
-              </Avatar>
-            ) : null}
-          </div>
-        }
+        description="Track your property inspections and view completed inspection reports. Reports reflect what the inspector observed — not legal title."
       />
 
-      <div className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {FILTERS.map((item) => (
-          <Button
-            key={item.value}
+      <div className="flex flex-wrap gap-2">
+        {tabs.map((t) => (
+          <button
+            key={t.id}
             type="button"
-            variant={filter === item.value ? "default" : "outline"}
-            size="sm"
-            onClick={() => setFilter(item.value)}
+            onClick={() => setFilter(t.id)}
             className={cn(
-              "whitespace-nowrap rounded-full px-3",
-              filter !== item.value && "border-border bg-card text-foreground/80 hover:bg-secondary",
+              "min-h-10 rounded-full px-4 text-sm font-medium",
+              filter === t.id ? "bg-primary text-primary-foreground" : "bg-secondary",
             )}
           >
-            {item.label}
-          </Button>
+            {t.label}
+          </button>
         ))}
       </div>
 
-      {filteredInspections.length === 0 ? (
-        <Card className="p-6 text-sm text-muted-foreground">
-          No inspections match this view yet. Try another status or request a new inspection from a property listing.
-        </Card>
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {filteredInspections.map((inspection) => {
-            const propertyForCard = properties.find((item) => item.id === inspection.propertyId);
-            const inspectorForCard = users.find((item) => item.id === inspection.inspectorId);
-            const meta = getInspectionMeta(inspection);
-            const dateText = inspection.scheduledAt ? formatDate(inspection.scheduledAt) : formatDate(inspection.createdAt);
-            const timeText = inspection.scheduledAt
-              ? new Date(inspection.scheduledAt).toLocaleTimeString("en-NG", {
-                  hour: "numeric",
-                  minute: "2-digit",
-                })
-              : "To be scheduled";
-
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
+        <ul className="space-y-2">
+          {filtered.map((i) => {
+            const p = properties.find((x) => x.id === i.propertyId);
+            const insp = users.find((u) => u.id === i.inspectorId);
+            const done = ["report_ready", "completed", "settlement_pending", "settled"].includes(
+              i.status,
+            );
             return (
-              <Card
-                key={inspection.id}
-                className={cn(
-                  "overflow-hidden p-0 transition-none hover:border-border/80",
-                  selected?.id === inspection.id && "border-primary/70 ring-1 ring-primary/30",
-                )}
-                onClick={() => setSelectedId(inspection.id)}
-              >
-                <div className="relative h-40 overflow-hidden">
-                  {propertyForCard?.images?.[0] ? (
-                    <img
-                      src={propertyForCard.images[0]}
-                      alt={propertyForCard.title}
-                      className="h-full w-full object-cover"
-                    />
-                  ) : null}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent" />
-                  <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 px-3 pb-3">
-                    <InspectionPill status={inspection.status} />
-                    <span className="rounded-full bg-white/90 px-2 py-1 text-[11px] font-semibold text-foreground shadow-sm">
-                      {formatNaira(inspection.fee)}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="space-y-4 p-4">
-                  <div>
-                    <h3 className="line-clamp-2 font-display text-xl font-medium leading-snug">{propertyForCard?.title ?? "Property viewing"}</h3>
-                    <p className="mt-1 flex items-center gap-1 text-sm text-muted-foreground">
-                      <MapPin className="size-3.5" />
-                      {propertyForCard ? `${propertyForCard.area}, ${propertyForCard.city}` : "Location to be confirmed"}
-                    </p>
-                  </div>
-
-                  <div className="space-y-2 text-sm text-muted-foreground">
-                    <div className="flex items-center gap-2">
-                      <CalendarDays className="size-4 text-foreground/70" />
-                      <span>{dateText}</span>
+              <li key={i.id}>
+                <Link
+                  to="/inspections"
+                  search={{ id: i.id }}
+                  className={cn(
+                    "block rounded-xl bg-card px-4 py-3 shadow-[var(--shadow-border)] transition-colors",
+                    selected?.id === i.id ? "ring-2 ring-primary/30" : "hover:bg-secondary/40",
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">{p?.title}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {p?.area}
+                        {insp?.displayName ? ` · ${insp.displayName}` : ""}
+                        {insp?.rating != null ? ` · ★ ${insp.rating}` : ""}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatNaira(i.fee)}
+                        {i.scheduledAt ? ` · ${formatDateTime(i.scheduledAt)}` : ""}
+                      </p>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Clock3 className="size-4 text-foreground/70" />
-                      <span>{timeText}</span>
-                    </div>
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex min-w-0 items-center gap-2">
-                        <Building2 className="size-4 text-foreground/70" />
-                        <span className="truncate">{inspectorForCard?.displayName ?? "Inspector assigned"}</span>
-                      </div>
-                      {inspectorForCard?.rating ? (
-                        <span className="flex items-center gap-1 text-amber-600">
-                          <Star className="size-3.5 fill-current" />
-                          {inspectorForCard.rating.toFixed(1)}
-                        </span>
+                    <div className="flex shrink-0 flex-col items-end gap-1">
+                      <InspectionPill status={i.status} />
+                      {done ? (
+                        <span className="text-[10px] font-medium text-primary">View report</span>
                       ) : null}
                     </div>
                   </div>
-
-                  <div className="rounded-xl border border-border bg-secondary/40 p-3 text-sm text-foreground/85">
-                    <p className="font-medium">{meta.label}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">{meta.message}</p>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    {meta.to === "/payments" ? (
-                      <Button asChild size="sm">
-                        <Link to="/payments">{meta.cta}</Link>
-                      </Button>
-                    ) : (
-                      <Button asChild size="sm">
-                        <Link to="/inspections/$id" params={{ id: inspection.id }}>
-                          {meta.cta}
-                        </Link>
-                      </Button>
-                    )}
-                    {inspection.chatUnlocked && inspection.status !== "cancelled" && inspection.status !== "disputed" ? (
-                      <Button asChild variant="outline" size="sm" onClick={(event) => event.stopPropagation()}>
-                        <Link
-                          to="/messages"
-                          search={{ c: conversations.find((c) => c.inspectionId === inspection.id)?.id ?? "" }}
-                          className="inline-flex items-center gap-2"
-                        >
-                          <MessageSquareText className="size-4" />
-                          Message inspector
-                        </Link>
-                      </Button>
-                    ) : null}
-                    {inspection.status === "requested" || inspection.status === "payment_pending" ? (
-                      <Button asChild variant="secondary" size="sm">
-                        <Link to="/payments" className="inline-flex items-center gap-2">
-                          <ShieldCheck className="size-4" />
-                          Pay now
-                        </Link>
-                      </Button>
-                    ) : null}
-                  </div>
-                </div>
-              </Card>
+                </Link>
+              </li>
             );
           })}
-        </div>
-      )}
+        </ul>
 
-      {selected && property ? (
-        <Card className="overflow-hidden border border-border/80 bg-card p-4">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">Highlighted</p>
-              <h2 className="mt-1 font-display text-2xl">{property.title}</h2>
-            </div>
-            <Button asChild variant="outline" size="sm">
-              <Link to="/inspections/$id" params={{ id: selected.id }} className="inline-flex items-center gap-2">
-                Open details
-                <ArrowRight className="size-4" />
-              </Link>
-            </Button>
-          </div>
-          <div className="mt-4 grid gap-3 sm:grid-cols-3 text-sm text-muted-foreground">
-            <div className="rounded-xl border border-border bg-secondary/30 p-3">
-              <p className="text-xs uppercase tracking-[0.12em] text-foreground/65">Inspector</p>
-              <p className="mt-2 font-medium text-foreground">{inspector?.displayName ?? "Inspector assigned"}</p>
-            </div>
-            <div className="rounded-xl border border-border bg-secondary/30 p-3">
-              <p className="text-xs uppercase tracking-[0.12em] text-foreground/65">Date</p>
-              <p className="mt-2 font-medium text-foreground">{selected.scheduledAt ? formatDateTime(selected.scheduledAt) : "To be scheduled"}</p>
-            </div>
-            <div className="rounded-xl border border-border bg-secondary/30 p-3">
-              <p className="text-xs uppercase tracking-[0.12em] text-foreground/65">Fee</p>
-              <p className="mt-2 font-medium text-foreground">{formatNaira(selected.fee)}</p>
-            </div>
-          </div>
-        </Card>
-      ) : null}
+        {selected && property ? (
+          <InspectionDetail
+            inspectionId={selected.id}
+            propertyId={property.id}
+            inspectorId={selected.inspectorId}
+            conversationId={conv?.id}
+            hasReport={hasReport}
+          />
+        ) : null}
+      </div>
     </div>
   );
 }
 
-export { getInspectionFilter };
+function InspectionDetail({
+  inspectionId,
+  propertyId,
+  inspectorId,
+  conversationId,
+  hasReport,
+}: {
+  inspectionId: string;
+  propertyId: string;
+  inspectorId: string;
+  conversationId?: string;
+  hasReport: boolean;
+}) {
+  const inspection = useFanecto((s) => s.inspections.find((i) => i.id === inspectionId)!);
+  const property = useFanecto((s) => s.properties.find((p) => p.id === propertyId)!);
+  const inspector = useFanecto((s) => s.users.find((u) => u.id === inspectorId));
+  const split = inspectionSplit(inspection.fee);
+
+  return (
+    <Card className="space-y-4 p-4 sm:p-6">
+      {/* A. Property header */}
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+            Inspection detail
+          </p>
+          <h2 className="font-display text-xl font-medium">{property.title}</h2>
+          <p className="text-sm text-muted-foreground">
+            {property.area}, {property.city}
+          </p>
+        </div>
+        <InspectionPill status={inspection.status} />
+      </div>
+
+      {property.images[0] ? (
+        <img
+          src={property.images[0]}
+          alt=""
+          className="aspect-[16/9] w-full rounded-xl object-cover"
+        />
+      ) : null}
+
+      {/* B–D. Inspector / Appointment / Fee — same structure always */}
+      <div className="grid gap-3 sm:grid-cols-2 text-sm">
+        <div>
+          <p className="text-xs text-muted-foreground">Inspector</p>
+          <p className="font-medium">{inspector?.displayName ?? "Inspector"}</p>
+          {inspector?.rating != null ? (
+            <p className="text-muted-foreground">★ {inspector.rating} platform rating</p>
+          ) : null}
+        </div>
+        <div>
+          <p className="text-xs text-muted-foreground">Appointment</p>
+          <p className="font-medium">
+            {inspection.scheduledAt ? formatDateTime(inspection.scheduledAt) : "To be confirmed"}
+          </p>
+        </div>
+        <div className="sm:col-span-2">
+          <p className="text-xs text-muted-foreground">Inspection fee</p>
+          <p className="font-medium tabular-nums">{formatNaira(inspection.fee)}</p>
+          <p className="text-xs text-muted-foreground">
+            Client pays {formatNaira(inspection.fee)}. Fanecto 20% ({formatNaira(split.fanecto)}) ·
+            Inspector 80% ({formatNaira(split.inspector)}) after report submission.
+          </p>
+        </div>
+      </div>
+
+      {/* State messages */}
+      {inspection.status === "awaiting_property_authorization" ? (
+        <p className="rounded-xl bg-secondary/60 px-3 py-2 text-sm">
+          The inspector accepted your request. The landlord or authorized agent must approve property access
+          before this inspection is confirmed.
+        </p>
+      ) : null}
+      {inspection.status === "access_declined" ? (
+        <p className="rounded-xl bg-secondary/60 px-3 py-2 text-sm">
+          Property access was not authorized, so this inspection cannot proceed. You may request another time
+          or choose another listing.
+        </p>
+      ) : null}
+      {inspection.status === "declined" ? (
+        <p className="rounded-xl bg-secondary/60 px-3 py-2 text-sm">
+          This inspector declined the appointment. Payment status is under review.
+        </p>
+      ) : null}
+      {inspection.status === "confirmed" || inspection.status === "scheduled" ? (
+        <p className="rounded-xl bg-secondary/40 px-3 py-2 text-sm">
+          ✓ Inspector accepted · ✓ Property access authorized
+        </p>
+      ) : null}
+      {inspection.status === "awaiting_confirmation" || inspection.status === "paid" ? (
+        <p className="rounded-xl bg-secondary/60 px-3 py-2 text-sm">
+          Payment received. Waiting for the inspector to accept this appointment.
+        </p>
+      ) : null}
+
+      {/* Actions — same area, state-aware */}
+      <div className="flex flex-wrap gap-2 border-t pt-4">
+        {hasReport ? (
+          <Button asChild size="sm">
+            <Link to="/inspections" search={{ id: inspectionId, view: "report" }}>
+              View report
+            </Link>
+          </Button>
+        ) : null}
+        <Button asChild variant="outline" size="sm">
+          <Link to="/properties/$id" params={{ id: property.id }}>
+            View property
+          </Link>
+        </Button>
+        {inspection.chatUnlocked && conversationId ? (
+          <Button asChild variant="outline" size="sm">
+            <Link to="/messages" search={{ c: conversationId }}>
+              Message inspector
+            </Link>
+          </Button>
+        ) : null}
+      </div>
+
+      {/* Rating — only when report ready and not yet rated */}
+      {hasReport ? (
+        <RateSection
+          inspectionId={inspectionId}
+          inspectorName={inspector?.displayName ?? "Inspector"}
+          clientRating={inspection.clientRating}
+          ratingSubmitted={!!inspection.ratingSubmitted}
+        />
+      ) : null}
+    </Card>
+  );
+}
+
+function RateSection({
+  inspectionId,
+  inspectorName,
+  clientRating,
+  ratingSubmitted,
+}: {
+  inspectionId: string;
+  inspectorName: string;
+  clientRating?: number;
+  ratingSubmitted: boolean;
+}) {
+  const rateInspection = useFanecto((s) => s.rateInspection);
+  const [rating, setRating] = useState(0);
+  const [text, setText] = useState("");
+
+  if (ratingSubmitted && clientRating) {
+    return (
+      <div className="rounded-xl border p-4 space-y-2">
+        <p className="text-sm font-medium">You rated {inspectorName}</p>
+        <div className="flex items-center gap-2">
+          <Stars value={clientRating} />
+          <span className="text-sm text-muted-foreground">{clientRating}/5</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border p-4 space-y-3">
+      <p className="font-medium">Rate inspector</p>
+      <p className="text-sm text-muted-foreground">How was your inspection experience with {inspectorName}?</p>
+      <div className="flex flex-wrap gap-1">
+        {[1, 2, 3, 4, 5].map((n) => (
+          <button
+            key={n}
+            type="button"
+            aria-label={`${n} stars`}
+            className="min-h-11 min-w-11 rounded-lg p-1"
+            onClick={() => setRating(n)}
+          >
+            <Stars value={n <= rating ? n : 0} />
+          </button>
+        ))}
+      </div>
+      {rating > 0 ? (
+        <p className="text-xs text-muted-foreground">{rating}/5 selected</p>
+      ) : (
+        <p className="text-xs text-muted-foreground">Select a rating to continue</p>
+      )}
+      <Textarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder="Optional comment"
+      />
+      <Button
+        size="sm"
+        disabled={rating < 1}
+        onClick={() => {
+          rateInspection(inspectionId, rating, text);
+          toast.success("Rating submitted");
+        }}
+      >
+        Submit rating
+      </Button>
+    </div>
+  );
+}
+
+function ReportView({
+  inspectionId,
+}: {
+  inspectionId: string;
+  onBack?: () => void;
+}) {
+  const inspection = useFanecto((s) => s.inspections.find((i) => i.id === inspectionId));
+  const property = useFanecto((s) => s.properties.find((p) => p.id === inspection?.propertyId));
+  const inspector = useFanecto((s) => s.users.find((u) => u.id === inspection?.inspectorId));
+  const report = inspection?.report;
+
+  if (!inspection || !property || !report) {
+    return (
+      <div className="space-y-4">
+        <p className="text-sm text-muted-foreground">Report not available.</p>
+        <Button asChild variant="outline">
+          <Link to="/inspections" search={{ id: inspectionId }}>
+            Back
+          </Link>
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mx-auto max-w-2xl space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+            Inspection report
+          </p>
+          <h1 className="font-display text-2xl font-medium">{property.title}</h1>
+          <p className="text-sm text-muted-foreground">
+            {property.area}, {property.city}
+          </p>
+        </div>
+        <InspectionPill status={inspection.status} />
+      </div>
+
+      <Card className="space-y-1 p-4 text-sm">
+        <p>
+          <span className="text-muted-foreground">Inspected by</span>{" "}
+          <span className="font-medium">{inspector?.displayName}</span>
+          {inspector?.rating != null ? ` · ★ ${inspector.rating}` : ""}
+        </p>
+        <p>
+          <span className="text-muted-foreground">Appointment</span>{" "}
+          {inspection.scheduledAt ? formatDateTime(inspection.scheduledAt) : "—"}
+        </p>
+        <p>
+          <span className="text-muted-foreground">Submitted</span>{" "}
+          {inspection.submittedAt || report.completedAt
+            ? formatDateTime(inspection.submittedAt ?? report.completedAt!)
+            : "—"}
+        </p>
+      </Card>
+
+      <ReportSection title="Summary">
+        <div className="grid gap-2 sm:grid-cols-2">
+          {report.generalCondition ? (
+            <Row label="Overall condition" value={report.generalCondition} />
+          ) : report.conditionSummary ? (
+            <Row label="Condition summary" value={report.conditionSummary} />
+          ) : null}
+          {report.water?.status ? <Row label="Water" value={report.water.status} /> : null}
+          {report.electricity?.condition ? (
+            <Row label="Electricity" value={report.electricity.condition} />
+          ) : null}
+          {report.matchesListing ? (
+            <Row label="Matches listing" value={report.matchesListing} />
+          ) : null}
+        </div>
+      </ReportSection>
+
+      {(report.propertyType || report.accessible) && (
+        <ReportSection title="Property basics">
+          {report.propertyType ? <Row label="Property type" value={report.propertyType} /> : null}
+          {report.generalCondition ? (
+            <Row label="General condition" value={report.generalCondition} />
+          ) : null}
+          {report.matchesListing ? (
+            <Row label="Matches listing" value={report.matchesListing} />
+          ) : null}
+          {report.accessible ? <Row label="Accessible" value={report.accessible} /> : null}
+        </ReportSection>
+      )}
+
+      {report.water && Object.keys(report.water).length > 0 && (
+        <ReportSection title="Water">
+          {report.water.status ? <Row label="Running water" value={report.water.status} /> : null}
+          {report.water.source ? <Row label="Source" value={report.water.source} /> : null}
+          {report.water.availability ? (
+            <Row label="Availability" value={report.water.availability} />
+          ) : null}
+          {report.water.pressure ? <Row label="Pressure" value={report.water.pressure} /> : null}
+          {report.water.notes ? <p className="text-sm text-muted-foreground">{report.water.notes}</p> : null}
+        </ReportSection>
+      )}
+
+      {report.electricity && Object.keys(report.electricity).length > 0 && (
+        <ReportSection title="Electricity">
+          {report.electricity.available ? (
+            <Row label="Available" value={report.electricity.available} />
+          ) : null}
+          {report.electricity.condition ? (
+            <Row label="Condition" value={report.electricity.condition} />
+          ) : null}
+          {report.electricity.backup ? <Row label="Backup" value={report.electricity.backup} /> : null}
+          {report.electricity.meter ? <Row label="Meter" value={report.electricity.meter} /> : null}
+          {report.electricity.fittings ? (
+            <Row label="Fittings" value={report.electricity.fittings} />
+          ) : null}
+        </ReportSection>
+      )}
+
+      {report.utilities ? (
+        <ReportSection title="Utilities observed">
+          <p className="text-sm">{report.utilities}</p>
+        </ReportSection>
+      ) : null}
+
+      {report.visibleIssues?.length ? (
+        <ReportSection title="Visible issues">
+          <ul className="list-disc pl-5 text-sm">
+            {report.visibleIssues.map((x) => (
+              <li key={x}>{x}</li>
+            ))}
+          </ul>
+        </ReportSection>
+      ) : null}
+
+      {report.listingVsObserved ? (
+        <ReportSection title="Listing vs observed">
+          <p className="text-sm">{report.listingVsObserved}</p>
+        </ReportSection>
+      ) : null}
+
+      <ReportSection title="Inspector notes">
+        <p className="whitespace-pre-wrap text-sm">{report.notes}</p>
+      </ReportSection>
+
+      {report.evidence?.length ? (
+        <ReportSection title="Inspection evidence">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {report.evidence.map((url) => (
+              <a key={url} href={url} target="_blank" rel="noreferrer">
+                <img src={url} alt="" className="aspect-square rounded-lg object-cover" />
+              </a>
+            ))}
+          </div>
+        </ReportSection>
+      ) : null}
+
+      {report.videoUrl ? (
+        <ReportSection title="Inspection video">
+          <video src={report.videoUrl} controls className="w-full rounded-xl" />
+        </ReportSection>
+      ) : null}
+
+      <p className="rounded-xl border bg-secondary/40 px-3 py-2 text-xs text-muted-foreground">
+        {report.disclaimer || INSPECTION_DISCLAIMER}
+      </p>
+
+      <div className="flex flex-wrap gap-2">
+        <Button asChild variant="outline">
+          <Link to="/inspections" search={{ id: inspectionId }}>
+            Back to inspection
+          </Link>
+        </Button>
+        <Button asChild variant="outline">
+          <Link to="/properties/$id" params={{ id: property.id }}>
+            View property
+          </Link>
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function ReportSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="space-y-2">
+      <h2 className="font-display text-lg font-medium">{title}</h2>
+      <div className="space-y-2">{children}</div>
+    </section>
+  );
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg bg-secondary/50 px-3 py-2 text-sm">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="font-medium">{value}</p>
+    </div>
+  );
+}

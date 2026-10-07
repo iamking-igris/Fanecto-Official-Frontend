@@ -38,15 +38,30 @@ export type InspectionStatus =
   | "requested"
   | "payment_pending"
   | "paid"
+  | "awaiting_confirmation"
+  | "awaiting_property_authorization"
+  | "confirmed"
   | "scheduled"
   | "in_progress"
   | "completed"
   | "report_ready"
   | "settlement_pending"
   | "settled"
+  | "declined"
+  | "access_declined"
   | "cancelled"
   | "no_show"
   | "disputed";
+
+export type PropertyAuthorizationStatus =
+  | "not_required"
+  | "pending"
+  | "approved"
+  | "declined"
+  | "reschedule_suggested";
+
+export type InspectionReportStatus = "not_submitted" | "draft" | "ready";
+export type InspectionPayoutStatus = "pending" | "processing" | "paid" | "not_applicable";
 
 export type PaymentKind = "rental" | "inspection" | "roommate";
 
@@ -145,6 +160,12 @@ export interface AvailabilityChange {
   createdAt: string;
 }
 
+export interface InspectionEvidencePhoto {
+  id: string;
+  url: string;
+  category: string;
+}
+
 export interface InspectionReport {
   roomsChecked: string[];
   conditionSummary: string;
@@ -154,7 +175,49 @@ export interface InspectionReport {
   notes: string;
   evidence: string[];
   disclaimer: string;
-  completedAt: string;
+  completedAt?: string;
+  propertyType?: string;
+  generalCondition?: string;
+  matchesListing?: string;
+  accessible?: string;
+  water?: {
+    status?: string;
+    source?: string;
+    availability?: string;
+    pressure?: string;
+    notes?: string;
+  };
+  electricity?: {
+    available?: string;
+    condition?: string;
+    backup?: string;
+    meter?: string;
+    fittings?: string;
+    notes?: string;
+  };
+  interior?: {
+    living?: Record<string, string>;
+    bedroom?: Record<string, string>;
+    kitchen?: Record<string, string>;
+    bathroom?: Record<string, string>;
+  };
+  environment?: {
+    drainage?: string;
+    roadAccess?: string;
+    floodingSigns?: string;
+    noise?: string;
+    general?: string;
+  };
+  security?: {
+    access?: string;
+    gate?: string;
+    surroundings?: string;
+    featuresObserved?: string;
+  };
+  presentDuring?: string;
+  photos?: InspectionEvidencePhoto[];
+  videoUrl?: string;
+  isDraft?: boolean;
 }
 
 export interface Inspection {
@@ -168,6 +231,16 @@ export interface Inspection {
   paidAt?: string;
   chatUnlocked: boolean;
   report?: InspectionReport;
+  reportStatus?: InspectionReportStatus;
+  payoutStatus?: InspectionPayoutStatus;
+  propertyAuthorizationStatus?: PropertyAuthorizationStatus;
+  suggestedScheduledAt?: string;
+  submittedAt?: string;
+  completedAt?: string;
+  /** Student's rating for THIS inspection (0 = not rated) */
+  clientRating?: number;
+  ratingSubmitted?: boolean;
+  ratingComment?: string;
   createdAt: string;
 }
 

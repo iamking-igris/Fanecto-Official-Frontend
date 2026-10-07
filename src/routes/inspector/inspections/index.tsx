@@ -1,10 +1,14 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { EmptyState } from "@/components/fanecto/empty-state";
+import { useMemo, useState } from "react";
 import { PageHeader } from "@/components/fanecto/page-header";
 import { InspectionPill } from "@/components/fanecto/status-pill";
 import { RoleGate } from "@/components/layout/role-gate";
-import { formatDateTime, formatNaira } from "@/lib/fanecto/format";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { formatDateTime, formatNaira, inspectionSplit } from "@/lib/fanecto/format";
 import { useCurrentFanectoUser, useFanecto } from "@/lib/fanecto/store";
+import type { InspectionStatus } from "@/lib/fanecto/types";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/inspector/inspections/")({
   component: () => (
@@ -14,40 +18,93 @@ export const Route = createFileRoute("/inspector/inspections/")({
   ),
 });
 
+type Filter = "all" | "new" | "awaiting_auth" | "upcoming" | "completed" | "declined";
+
 function View() {
   const user = useCurrentFanectoUser();
-  const inspections = useFanecto((s) => s.inspections.filter((i) => i.inspectorId === user?.id));
+  const [filter, setFilter] = useState<Filter>("all");
   const properties = useFanecto((s) => s.properties);
+  const users = useFanecto((s) => s.users);
+  const inspections = useFanecto((s) => s.inspections.filter((i) => i.inspectorId === user?.id));
+
+  const filtered = useMemo(() => {
+    return inspections.filter((i) => {
+      if (filter === "new") return ["awaiting_confirmation", "paid", "requested"].includes(i.status);
+      if (filter === "awaiting_auth") return i.status === "awaiting_property_authorization";
+      if (filter === "upcoming") return ["confirmed", "scheduled", "in_progress"].includes(i.status);
+      if (filter === "completed")
+        return ["report_ready", "completed", "settlement_pending", "settled"].includes(i.status);
+      if (filter === "declined") return ["declined", "access_declined", "cancelled"].includes(i.status);
+      return true;
+    });
+  }, [inspections, filter]);
+
+  const tabs: { id: Filter; label: string }[] = [
+    { id: "all", label: "All" },
+    { id: "new", label: "New" },
+    { id: "awaiting_auth", label: "Awaiting auth" },
+    { id: "upcoming", label: "Upcoming" },
+    { id: "completed", label: "Completed" },
+    { id: "declined", label: "Declined" },
+  ];
+
   return (
     <div className="space-y-6">
       <PageHeader
         kicker="Jobs"
-        title="Inspections"
-        description="Chat unlocks after the seeker pays. File a physical-observation report after the visit."
+        title="Inspection requests"
+        description="Accept or decline paid requests. Submit a report only after the physical visit. Payout becomes eligible after report submission."
       />
-      {inspections.length === 0 ? (
-        <EmptyState title="No jobs assigned." body="When a seeker books you, the visit will appear here." />
+
+      <div className="flex flex-wrap gap-2">
+        {tabs.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => setFilter(t.id)}
+            className={cn(
+              "min-h-10 rounded-full px-4 text-sm font-medium transition-colors",
+              filter === t.id ? "bg-primary text-primary-foreground" : "bg-secondary text-foreground",
+            )}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {filtered.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No inspections in this filter.</p>
       ) : (
         <ul className="space-y-3">
-          {inspections.map((i) => {
+          {filtered.map((i) => {
             const p = properties.find((x) => x.id === i.propertyId);
+            const client = users.find((u) => u.id === i.seekerId);
+            const split = inspectionSplit(i.fee);
             return (
-              <li key={i.id}>
-                <Link
-                  to="/inspector/inspections/$id"
-                  params={{ id: i.id }}
-                  className="surface lift flex flex-wrap items-center justify-between gap-3 p-4"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate font-medium">{p?.title}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatNaira(i.fee)} · chat {i.chatUnlocked ? "unlocked" : "locked"}
-                      {i.scheduledAt ? ` · ${formatDateTime(i.scheduledAt)}` : ""}
+              <Card key={i.id} className="p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-medium">{p?.title ?? i.id}</p>
+                      <InspectionPill status={i.status as InspectionStatus} />
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {p?.area} · {client?.displayName}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {i.scheduledAt ? formatDateTime(i.scheduledAt) : "Schedule TBC"}
+                    </p>
+                    <p className="mt-1 text-sm tabular-nums">
+                      {formatNaira(i.fee)} inspection · You {formatNaira(split.inspector)} after 20%
                     </p>
                   </div>
-                  <InspectionPill status={i.status} />
-                </Link>
-              </li>
+                  <Button asChild size="sm">
+                    <Link to="/inspector/inspections/$id" params={{ id: i.id }}>
+                      View
+                    </Link>
+                  </Button>
+                </div>
+              </Card>
             );
           })}
         </ul>
