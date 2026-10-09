@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatDateTime, formatNaira, relativeTime } from "@/lib/fanecto/format";
+import { canAccessRoommateChat } from "@/lib/fanecto/roommate-logic";
 import { useCurrentFanectoUser, useFanecto } from "@/lib/fanecto/store";
 import { cn } from "@/lib/utils";
 
@@ -56,6 +57,7 @@ export function Inbox({ initialId }: { initialId?: string }) {
   const properties = useFanecto((s) => s.properties);
   const inspections = useFanecto((s) => s.inspections);
   const sendMessage = useFanecto((s) => s.sendMessage);
+  const roommateConnections = useFanecto((s) => s.roommateConnections);
   const [active, setActive] = useState<string | undefined>(initialId ?? conversations[0]?.id);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
@@ -91,6 +93,19 @@ export function Inbox({ initialId }: { initialId?: string }) {
   const inspection = conv?.inspectionId
     ? inspections.find((i) => i.id === conv.inspectionId)
     : undefined;
+  const roommateChatAvailable =
+    !user || !conv || conv.context !== "roommate"
+      ? true
+      : canAccessRoommateChat(
+          conv.roommateListingId
+            ? roommateConnections.find(
+                (c) =>
+                  c.listingId === conv.roommateListingId &&
+                  c.paid &&
+                  (c.seekerId === user.id || c.creatorId === user.id),
+              )
+            : undefined,
+        );
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -116,7 +131,7 @@ export function Inbox({ initialId }: { initialId?: string }) {
 
   const handleSend = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!draft.trim() || !active || conv?.restricted) return;
+    if (!draft.trim() || !active || conv?.restricted || !roommateChatAvailable) return;
     setSending(true);
     sendMessage(active, draft.trim());
     setDraft("");
@@ -350,15 +365,15 @@ export function Inbox({ initialId }: { initialId?: string }) {
               <Input
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
-                placeholder={conv.restricted ? "This thread is restricted" : "Write a message…"}
-                disabled={conv.restricted || sending}
+                placeholder={conv.restricted || !roommateChatAvailable ? "This thread is inactive" : "Write a message…"}
+                disabled={conv.restricted || !roommateChatAvailable || sending}
                 className="min-h-10 flex-1 rounded-full border-border bg-secondary/50 px-4"
                 autoComplete="off"
               />
               <Button
                 type="submit"
                 size="icon"
-                disabled={conv.restricted || !draft.trim() || sending}
+                disabled={conv.restricted || !roommateChatAvailable || !draft.trim() || sending}
                 className="size-10 shrink-0 rounded-full"
                 aria-label="Send"
               >

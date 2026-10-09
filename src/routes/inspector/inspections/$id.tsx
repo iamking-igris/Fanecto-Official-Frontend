@@ -1,7 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { useMemo, useState } from "react";
-import { Inbox } from "@/components/fanecto/inbox";
 import { InspectionPill } from "@/components/fanecto/status-pill";
 import { RoleGate } from "@/components/layout/role-gate";
 import { Button } from "@/components/ui/button";
@@ -191,12 +190,22 @@ function View({ id }: { id: string }) {
     value,
     onChange,
     options = CHOICE as unknown as string[],
+    readOnly = false,
   }: {
     label: string;
     value?: string;
     onChange: (v: string) => void;
     options?: string[];
+    readOnly?: boolean;
   }) {
+    if (readOnly) {
+      return (
+        <div className="rounded-lg bg-secondary/50 px-3 py-2 text-sm">
+          <p className="text-xs text-muted-foreground">{label}</p>
+          <p className="font-medium">{value?.trim() ? value : "Not provided"}</p>
+        </div>
+      );
+    }
     return (
       <div className="space-y-2">
         <Label>{label}</Label>
@@ -259,7 +268,11 @@ function View({ id }: { id: string }) {
             </div>
           </div>
           <Button asChild variant="outline" size="sm">
-            <Link to="/properties/$id" params={{ id: property.id }}>
+            <Link
+              to="/properties/$id"
+              params={{ id: property.id }}
+              search={{ from: `/inspector/inspections/${id}` }}
+            >
               View property
             </Link>
           </Button>
@@ -348,7 +361,7 @@ function View({ id }: { id: string }) {
           ) : null}
           {conv && inspection.chatUnlocked ? (
             <Button asChild variant="outline">
-              <Link to="/messages" search={{ c: conv.id }}>
+              <Link to="/inspector/messages" search={{ c: conv.id }}>
                 Message client
               </Link>
             </Button>
@@ -356,18 +369,11 @@ function View({ id }: { id: string }) {
         </Card>
       ) : null}
 
-      {inspection.chatUnlocked && conv ? (
-        <div className="space-y-2">
-          <h2 className="font-display text-lg font-medium">Messages</h2>
-          <div className="overflow-hidden rounded-2xl border">
-            <Inbox initialId={conv.id} />
-          </div>
-        </div>
-      ) : (
+      {!inspection.chatUnlocked ? (
         <p className="text-sm text-muted-foreground">
-          Chat unlocks after the client pays the inspection fee.
+          Message client unlocks after the client pays the inspection fee.
         </p>
-      )}
+      ) : null}
 
       {/* Accept modal */}
       <Dialog open={acceptOpen} onOpenChange={setAcceptOpen}>
@@ -478,24 +484,28 @@ function View({ id }: { id: string }) {
                 <ChoiceRow
                   label="Property type"
                   value={report.propertyType}
+                  readOnly={isDone}
                   onChange={(v) => !isDone && setField("propertyType", v)}
                   options={["Self-contained", "Mini-flat", "1 bedroom", "2 bedroom", "3 bedroom", "Duplex", "Other"]}
                 />
                 <ChoiceRow
                   label="General condition"
                   value={report.generalCondition}
+                  readOnly={isDone}
                   onChange={(v) => !isDone && setField("generalCondition", v)}
                   options={["Excellent", "Good", "Fair", "Poor"]}
                 />
                 <ChoiceRow
                   label="Condition matches listing"
                   value={report.matchesListing}
+                  readOnly={isDone}
                   onChange={(v) => !isDone && setField("matchesListing", v)}
                   options={["Yes", "Partially", "No"]}
                 />
                 <ChoiceRow
                   label="Property accessible during inspection"
                   value={report.accessible}
+                  readOnly={isDone}
                   onChange={(v) => !isDone && setField("accessible", v)}
                   options={["Yes", "No"]}
                 />
@@ -509,12 +519,14 @@ function View({ id }: { id: string }) {
                 <ChoiceRow
                   label="Water source"
                   value={report.water?.source}
+                  readOnly={isDone}
                   onChange={(v) => !isDone && setField("water.source", v)}
                   options={["Borehole", "Public supply", "Well", "Water tank", "Other"]}
                 />
                 <ChoiceRow
                   label="Availability"
                   value={report.water?.availability}
+                  readOnly={isDone}
                   onChange={(v) => !isDone && setField("water.availability", v)}
                   options={["Consistent", "Intermittent", "Unavailable"]}
                 />
@@ -537,30 +549,35 @@ function View({ id }: { id: string }) {
                 <ChoiceRow
                   label="Electricity available"
                   value={report.electricity?.available}
+                  readOnly={isDone}
                   onChange={(v) => !isDone && setField("electricity.available", v)}
                   options={["Yes", "No"]}
                 />
                 <ChoiceRow
                   label="Power condition observed"
                   value={report.electricity?.condition}
+                  readOnly={isDone}
                   onChange={(v) => !isDone && setField("electricity.condition", v)}
                   options={["Good", "Fair", "Poor"]}
                 />
                 <ChoiceRow
                   label="Backup power"
                   value={report.electricity?.backup}
+                  readOnly={isDone}
                   onChange={(v) => !isDone && setField("electricity.backup", v)}
                   options={["Generator", "Inverter", "Solar", "None", "Other"]}
                 />
                 <ChoiceRow
                   label="Meter"
                   value={report.electricity?.meter}
+                  readOnly={isDone}
                   onChange={(v) => !isDone && setField("electricity.meter", v)}
                   options={["Prepaid", "Postpaid", "Unknown"]}
                 />
                 <ChoiceRow
                   label="Electrical fittings"
                   value={report.electricity?.fittings}
+                  readOnly={isDone}
                   onChange={(v) => !isDone && setField("electricity.fittings", v)}
                   options={["Good", "Fair", "Poor"]}
                 />
@@ -576,6 +593,7 @@ function View({ id }: { id: string }) {
                     <ChoiceRow
                       label="Condition"
                       value={(report.interior as any)?.[area]?.condition}
+                  readOnly={isDone}
                       onChange={(v) => !isDone && setField(`int.${area}.condition`, v)}
                     />
                   </div>
@@ -613,6 +631,7 @@ function View({ id }: { id: string }) {
                 <ChoiceRow
                   label="Who was present?"
                   value={report.presentDuring}
+                  readOnly={isDone}
                   onChange={(v) => !isDone && setField("presentDuring", v)}
                   options={["Landlord", "Agent", "Caretaker", "Other"]}
                 />
@@ -649,27 +668,82 @@ function View({ id }: { id: string }) {
                     }
                   />
                 </div>
-                <div>
-                  <Label>Evidence image URL (mock)</Label>
-                  <Input
-                    className="mt-1"
-                    disabled={isDone}
-                    placeholder="Paste image URL to add"
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        const v = (e.target as HTMLInputElement).value.trim();
-                        if (v) {
-                          setReport((r) => ({ ...r, evidence: [...r.evidence, v] }));
-                          (e.target as HTMLInputElement).value = "";
-                        }
-                      }
-                    }}
-                  />
+                <div className="space-y-2">
+                  <Label>Inspection photos</Label>
+                  {!isDone ? (
+                    <Input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/jpg"
+                      multiple
+                      className="mt-1 cursor-pointer"
+                      onChange={(e) => {
+                        const files = Array.from(e.target.files ?? []);
+                        files.forEach((file) => {
+                          const url = URL.createObjectURL(file);
+                          setReport((r) => ({ ...r, evidence: [...r.evidence, url] }));
+                        });
+                        e.target.value = "";
+                      }}
+                    />
+                  ) : null}
                   <div className="mt-2 flex flex-wrap gap-2">
                     {report.evidence.map((url) => (
-                      <img key={url} src={url} alt="" className="size-20 rounded-lg object-cover" />
+                      <div key={url} className="relative">
+                        <img src={url} alt="" className="size-20 rounded-lg object-cover" />
+                        {!isDone ? (
+                          <button
+                            type="button"
+                            className="absolute -right-1 -top-1 rounded-full bg-destructive px-1.5 text-xs text-destructive-foreground"
+                            onClick={() =>
+                              setReport((r) => ({
+                                ...r,
+                                evidence: r.evidence.filter((x) => x !== url),
+                              }))
+                            }
+                          >
+                            ×
+                          </button>
+                        ) : null}
+                      </div>
                     ))}
+                    {report.evidence.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No photos yet</p>
+                    ) : null}
                   </div>
+                  <Label className="mt-3 block">Inspection video (max 1)</Label>
+                  {!isDone ? (
+                    <Input
+                      type="file"
+                      accept="video/*"
+                      className="mt-1 cursor-pointer"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const url = URL.createObjectURL(file);
+                          setReport((r) => ({ ...r, videoUrl: url }));
+                        }
+                        e.target.value = "";
+                      }}
+                    />
+                  ) : null}
+                  {report.videoUrl ? (
+                    <div className="relative mt-2">
+                      <video src={report.videoUrl} controls className="max-h-48 w-full rounded-xl" />
+                      {!isDone ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="mt-1"
+                          onClick={() => setReport((r) => ({ ...r, videoUrl: undefined }))}
+                        >
+                          Remove video
+                        </Button>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No video</p>
+                  )}
                 </div>
               </div>
             )}

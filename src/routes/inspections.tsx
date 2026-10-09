@@ -301,7 +301,11 @@ function InspectionDetail({
           </Button>
         ) : null}
         <Button asChild variant="outline" size="sm">
-          <Link to="/properties/$id" params={{ id: property.id }}>
+          <Link
+            to="/properties/$id"
+            params={{ id: property.id }}
+            search={{ from: `/inspections?id=${inspectionId}` }}
+          >
             View property
           </Link>
         </Button>
@@ -565,7 +569,11 @@ function ReportView({
           </Link>
         </Button>
         <Button asChild variant="outline">
-          <Link to="/properties/$id" params={{ id: property.id }}>
+          <Link
+            to="/properties/$id"
+            params={{ id: property.id }}
+            search={{ from: `/inspections?id=${inspectionId}` }}
+          >
             View property
           </Link>
         </Button>

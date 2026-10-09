@@ -21,6 +21,12 @@ import { properties as seedProperties } from "./data/properties";
 import { users as seedUsers, verificationRecords as seedVerifications } from "./data/users";
 import { detectCircumvention, inspectionSplit, rentalFee } from "./format";
 import { ROOMMATE_CONNECTION_FEE } from "./constants";
+import {
+  canAccessRoommateChat,
+  getActiveRoommateConnection,
+  hasActiveRoommateReservation,
+  isRoommateListingAvailableForConnection,
+} from "./roommate-logic";
 import type {
   AgentAgreement,
   AppNotification,
@@ -100,6 +106,10 @@ interface FanectoActions {
   payRent: (propertyId: string) => { ok: boolean; error?: string; paymentId?: string };
   createRoommateListing: (listing: Omit<RoommateListing, "id" | "createdAt" | "status" | "creatorId">) => string;
   payRoommateConnection: (listingId: string) => { ok: boolean; error?: string };
+  updateRoommateListing: (id: string, patch: Partial<RoommateListing>) => void;
+  setRoommateListingStatus: (id: string, status: RoommateListing["status"]) => void;
+  acceptRoommateConnection: (connectionId: string) => void;
+  declineRoommateConnection: (connectionId: string) => void;
   rateInspection: (inspectionId: string, rating: number, comment?: string) => void;
   submitReview: (promptId: string, rating: number, text: string) => void;
   dismissPrompt: (promptId: string) => void;
@@ -204,6 +214,20 @@ export const useFanecto = createWithEqualityFn<FanectoState & FanectoActions>()(
         const conv = s.conversations.find((c) => c.id === conversationId);
         if (!conv) return { blocked: true };
         if (conv.restricted) return { blocked: true };
+
+        if (conv.context === "roommate" && conv.roommateListingId) {
+          const connection = s.roommateConnections.find(
+            (c) =>
+              c.listingId === conv.roommateListingId &&
+              c.paid &&
+              ((c.seekerId === user.id && c.creatorId === conv.participantIds.find((id) => id !== user.id)) ||
+                (c.creatorId === user.id && c.seekerId === conv.participantIds.find((id) => id !== user.id))),
+          );
+          if (!canAccessRoommateChat(connection)) {
+            return { blocked: true };
+          }
+        }
+
         let warned: string | undefined;
         let circumventionWarnings = conv.circumventionWarnings;
         let restricted: boolean = conv.restricted;
@@ -683,12 +707,25 @@ export const useFanecto = createWithEqualityFn<FanectoState & FanectoActions>()(
         const user = s.currentUser();
         const listing = s.roommateListings.find((l) => l.id === listingId);
         if (!user || !listing) return { ok: false, error: "Listing not found." };
-        if (listing.status === "closed") return { ok: false, error: "This listing is closed." };
+        if (listing.status !== "active") return { ok: false, error: "This listing is not available right now." };
         if (listing.creatorId === user.id) return { ok: false, error: "You created this listing." };
-        const existing = s.roommateConnections.find(
-          (c) => c.listingId === listingId && c.seekerId === user.id && c.paid,
-        );
-        if (existing) return { ok: true };
+
+        const currentConnection = getActiveRoommateConnection(listingId, user.id, s.roommateConnections);
+        if (currentConnection) {
+          if (currentConnection.status === "pending" || currentConnection.status === "accepted") {
+            return { ok: true };
+          }
+        }
+
+        const hasPendingReservation = hasActiveRoommateReservation(listingId, s.roommateConnections);
+        if (hasPendingReservation) {
+          return { ok: false, error: "This listing is temporarily unavailable while a connection request is being reviewed." };
+        }
+
+        if (!isRoommateListingAvailableForConnection(listing, s.roommateConnections)) {
+          return { ok: false, error: "This listing is no longer available for a new request." };
+        }
+
         const connection: RoommateConnection = {
           id: nid("rc"),
           listingId,
@@ -697,7 +734,7 @@ export const useFanecto = createWithEqualityFn<FanectoState & FanectoActions>()(
           fee: ROOMMATE_CONNECTION_FEE,
           paid: true,
           chatUnlocked: true,
-          status: "connected",
+          status: "pending",
           createdAt: now(),
         };
         const payment: Payment = {
@@ -710,31 +747,47 @@ export const useFanecto = createWithEqualityFn<FanectoState & FanectoActions>()(
           createdAt: now(),
           reference: `FCT-RM-${Math.floor(10000 + Math.random() * 89999)}`,
         };
-        const conv: Conversation = {
+        const title = `Roommate · ${listing.title || listing.preferredArea}`;
+        const existingConversation = s.conversations.find(
+          (c) =>
+            c.context === "roommate" &&
+            c.roommateListingId === listingId &&
+            c.participantIds.includes(user.id) &&
+            c.participantIds.includes(listing.creatorId),
+        );
+        const conv = existingConversation ?? {
           id: nid("cv"),
-          context: "roommate",
-          title: `Roommate · ${listing.displayName}`,
+          context: "roommate" as const,
+          title,
           participantIds: [user.id, listing.creatorId],
           roommateListingId: listingId,
           circumventionWarnings: 0,
           restricted: false,
           updatedAt: now(),
         };
+
         set({
           roommateConnections: [connection, ...s.roommateConnections],
           payments: [payment, ...s.payments],
-          conversations: [conv, ...s.conversations],
-          roommateListings: s.roommateListings.map((l) =>
-            l.id === listingId ? { ...l, status: "connected" } : l,
-          ),
+          conversations: existingConversation ? s.conversations : [conv, ...s.conversations],
           notifications: [
             {
               id: nid("n"),
               recipientId: listing.creatorId,
               type: "roommate_connection",
-              title: "New roommate connection",
-              body: `${user.displayName} paid \u20a63,000 to connect. Chat is unlocked.`,
-              href: "/messages",
+              title: "New roommate connection request",
+              body: `${user.displayName} paid ₦3,000 and requested to connect. Accept or decline the request.`,
+              href: "/roommates",
+              read: false,
+              createdAt: now(),
+            },
+            {
+              id: nid("n"),
+              recipientId: user.id,
+              type: "roommate_connection",
+              title: "Payment successful",
+              body: "Your connection request has been sent. You can now chat with the post owner while they decide whether to accept or decline.",
+              href: `/messages?c=${conv.id}`,
               read: false,
               createdAt: now(),
             },
@@ -743,6 +796,111 @@ export const useFanecto = createWithEqualityFn<FanectoState & FanectoActions>()(
         });
         return { ok: true };
       },
+
+      updateRoommateListing: (id, patch) =>
+        set((st) => ({
+          roommateListings: st.roommateListings.map((l) => (l.id === id ? { ...l, ...patch } : l)),
+        })),
+      setRoommateListingStatus: (id, status) =>
+        set((st) => ({
+          roommateListings: st.roommateListings.map((l) => (l.id === id ? { ...l, status } : l)),
+        })),
+      acceptRoommateConnection: (connectionId) =>
+        set((st) => {
+          const conn = st.roommateConnections.find((c) => c.id === connectionId);
+          if (!conn || conn.status !== "pending") return st;
+          const listing = st.roommateListings.find((l) => l.id === conn.listingId);
+          const title = listing
+            ? `Roommate · ${listing.title || listing.preferredArea}`
+            : "Roommate connection";
+          const existingConv = st.conversations.find(
+            (c) =>
+              c.context === "roommate" &&
+              c.roommateListingId === conn.listingId &&
+              c.participantIds.includes(conn.seekerId) &&
+              c.participantIds.includes(conn.creatorId),
+          );
+          const conv = existingConv ?? {
+            id: nid("cv"),
+            context: "roommate" as const,
+            title,
+            participantIds: [conn.seekerId, conn.creatorId],
+            roommateListingId: conn.listingId,
+            circumventionWarnings: 0,
+            restricted: false,
+            updatedAt: now(),
+          };
+
+          const acceptedCount = st.roommateConnections.filter(
+            (c) => c.listingId === conn.listingId && c.paid && c.status === "accepted",
+          ).length;
+          const remainingAfter = listing ? Math.max(0, listing.roommatesWanted - acceptedCount - 1) : 0;
+          const nextListingStatus =
+            listing && listing.status === "active" && remainingAfter <= 0 ? "closed" : listing?.status ?? "active";
+
+          return {
+            roommateConnections: st.roommateConnections.map((c) =>
+              c.id === connectionId ? { ...c, status: "accepted" as const, chatUnlocked: true } : c,
+            ),
+            roommateListings: listing
+              ? st.roommateListings.map((l) =>
+                  l.id === conn.listingId ? { ...l, status: nextListingStatus } : l,
+                )
+              : st.roommateListings,
+            conversations: existingConv
+              ? st.conversations.map((c) =>
+                  c.id === existingConv.id ? { ...c, restricted: false, updatedAt: now() } : c,
+                )
+              : [conv, ...st.conversations],
+            notifications: [
+              {
+                id: nid("n"),
+                recipientId: conn.seekerId,
+                type: "roommate_connection",
+                title: "Connection accepted",
+                body: "The post owner has accepted your roommate request. You can continue chatting.",
+                href: "/messages",
+                read: false,
+                createdAt: now(),
+              },
+              ...st.notifications,
+            ],
+          };
+        }),
+      declineRoommateConnection: (connectionId) =>
+        set((st) => {
+          const conn = st.roommateConnections.find((c) => c.id === connectionId);
+          if (!conn || conn.status !== "pending") return st;
+          const listing = st.roommateListings.find((l) => l.id === conn.listingId);
+          const shouldReopen =
+            listing && listing.status === "active" && listing.roommatesWanted > 0;
+          return {
+            roommateConnections: st.roommateConnections.map((c) =>
+              c.id === connectionId ? { ...c, status: "declined" as const, chatUnlocked: false } : c,
+            ),
+            roommateListings: listing && shouldReopen
+              ? st.roommateListings.map((l) => (l.id === conn.listingId ? { ...l, status: "active" } : l))
+              : st.roommateListings,
+            conversations: st.conversations.map((c) =>
+              c.context === "roommate" && c.roommateListingId === conn.listingId
+                ? { ...c, restricted: true, updatedAt: now() }
+                : c,
+            ),
+            notifications: [
+              {
+                id: nid("n"),
+                recipientId: conn.seekerId,
+                type: "roommate_connection",
+                title: "Request declined",
+                body: "The post owner has declined your roommate request. You can continue browsing other available listings.",
+                href: "/roommates",
+                read: false,
+                createdAt: now(),
+              },
+              ...st.notifications,
+            ],
+          };
+        }),
       rateInspection: (inspectionId, rating, comment) =>
         set((st) => {
           if (rating < 1 || rating > 5) return st;

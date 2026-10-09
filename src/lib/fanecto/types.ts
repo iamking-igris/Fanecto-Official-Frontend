@@ -85,11 +85,10 @@ export type AgreementStatus =
   | "ended"
   | "rejected";
 
-export type RoommateStatus =
-  | "active"
-  | "connection_requested"
-  | "connected"
-  | "closed";
+export type RoommateListingStatus = "draft" | "active" | "paused" | "closed";
+/** @deprecated use RoommateListingStatus / RoommateConnectionStatus */
+export type RoommateStatus = RoommateListingStatus | RoommateConnectionStatus | "connected" | "connection_requested";
+export type RoommateConnectionStatus = "pending" | "accepted" | "declined";
 
 export type ConversationContext = "rental" | "inspection" | "roommate" | "agreement";
 
@@ -312,20 +311,27 @@ export interface RoommateListing {
   id: string;
   creatorId: string;
   displayName: string;
+  title: string;
   school: string;
   campus: string;
   location: string;
   preferredArea: string;
+  housingType?: string;
   budget: number;
   moveIn: string;
   roommatesWanted: number;
-  lifestyle: string;
-  quietSocial: "quiet" | "balanced" | "social";
-  cleanliness: "relaxed" | "tidy" | "very-tidy";
-  smoking: "no" | "outside" | "yes";
-  pets: "no" | "yes";
+  /** Hostel amenities only — no lifestyle/dating fields */
+  amenities: string[];
   bio: string;
-  status: RoommateStatus;
+  /** Housing / room photos */
+  images: string[];
+  gender?: "male" | "female" | "other";
+  lookingFor?: "male" | "female" | "any";
+  age?: number;
+  occupation?: string;
+  level?: string;
+  avatarUrl?: string;
+  status: RoommateListingStatus;
   createdAt: string;
 }
 
@@ -336,8 +342,9 @@ export interface RoommateConnection {
   creatorId: string;
   fee: number;
   paid: boolean;
+  /** Only true after owner accepts */
   chatUnlocked: boolean;
-  status: RoommateStatus;
+  status: RoommateConnectionStatus;
   createdAt: string;
 }
 

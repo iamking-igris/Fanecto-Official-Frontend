@@ -11,16 +11,23 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AboutRouteImport } from './routes/about'
+import { Route as ContactRouteImport } from './routes/contact'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as FaqRouteImport } from './routes/faq'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
+import { Route as HelpRouteImport } from './routes/help'
 import { Route as HowItWorksRouteImport } from './routes/how-it-works'
 import { Route as InspectionsRouteImport } from './routes/inspections'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as MessagesRouteImport } from './routes/messages'
 import { Route as PaymentsRouteImport } from './routes/payments'
+import { Route as PricingRouteImport } from './routes/pricing'
+import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as RegisterRouteImport } from './routes/register'
 import { Route as SavedRouteImport } from './routes/saved'
+import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as TermsRouteImport } from './routes/terms'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AdminAuditLogsRouteImport } from './routes/admin/audit-logs'
 import { Route as AdminInspectionsRouteImport } from './routes/admin/inspections'
@@ -43,6 +50,7 @@ import { Route as AgentVerificationRouteImport } from './routes/agent/verificati
 import { Route as InspectorAvailabilityRouteImport } from './routes/inspector/availability'
 import { Route as InspectorDashboardRouteImport } from './routes/inspector/dashboard'
 import { Route as InspectorEarningsRouteImport } from './routes/inspector/earnings'
+import { Route as InspectorMessagesRouteImport } from './routes/inspector/messages'
 import { Route as InspectorProfileRouteImport } from './routes/inspector/profile'
 import { Route as InspectorReportsRouteImport } from './routes/inspector/reports'
 import { Route as LandlordIndexRouteImport } from './routes/landlord/index'
@@ -68,6 +76,7 @@ import { Route as InspectorInspectionsIdRouteImport } from './routes/inspector/i
 import { Route as LandlordAgreementsIndexRouteImport } from './routes/landlord/agreements/index'
 import { Route as LandlordAgreementsIdRouteImport } from './routes/landlord/agreements/$id'
 import { Route as LandlordPropertiesIndexRouteImport } from './routes/landlord/properties/index'
+import { Route as LandlordPropertiesIdRouteImport } from './routes/landlord/properties/$id'
 import { Route as LandlordPropertiesNewRouteImport } from './routes/landlord/properties/new'
 
 const IndexRoute = IndexRouteImport.update({
@@ -80,14 +89,29 @@ const AboutRoute = AboutRouteImport.update({
   path: '/about',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ContactRoute = ContactRouteImport.update({
+  id: '/contact',
+  path: '/contact',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DashboardRoute = DashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FaqRoute = FaqRouteImport.update({
+  id: '/faq',
+  path: '/faq',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
   id: '/forgot-password',
   path: '/forgot-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HelpRoute = HelpRouteImport.update({
+  id: '/help',
+  path: '/help',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HowItWorksRoute = HowItWorksRouteImport.update({
@@ -115,6 +139,16 @@ const PaymentsRoute = PaymentsRouteImport.update({
   path: '/payments',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PricingRoute = PricingRouteImport.update({
+  id: '/pricing',
+  path: '/pricing',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProfileRoute = ProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
@@ -128,6 +162,16 @@ const RegisterRoute = RegisterRouteImport.update({
 const SavedRoute = SavedRouteImport.update({
   id: '/saved',
   path: '/saved',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminIndexRoute = AdminIndexRouteImport.update({
@@ -238,6 +282,11 @@ const InspectorDashboardRoute = InspectorDashboardRouteImport.update({
 const InspectorEarningsRoute = InspectorEarningsRouteImport.update({
   id: '/inspector/earnings',
   path: '/inspector/earnings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InspectorMessagesRoute = InspectorMessagesRouteImport.update({
+  id: '/inspector/messages',
+  path: '/inspector/messages',
   getParentRoute: () => rootRouteImport,
 } as any)
 const InspectorProfileRoute = InspectorProfileRouteImport.update({
@@ -366,6 +415,11 @@ const LandlordPropertiesIndexRoute = LandlordPropertiesIndexRouteImport.update({
   path: '/landlord/properties/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LandlordPropertiesIdRoute = LandlordPropertiesIdRouteImport.update({
+  id: '/landlord/properties/$id',
+  path: '/landlord/properties/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LandlordPropertiesNewRoute = LandlordPropertiesNewRouteImport.update({
   id: '/landlord/properties/new',
   path: '/landlord/properties/new',
@@ -375,16 +429,23 @@ const LandlordPropertiesNewRoute = LandlordPropertiesNewRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/contact': typeof ContactRoute
   '/dashboard': typeof DashboardRoute
+  '/faq': typeof FaqRoute
   '/forgot-password': typeof ForgotPasswordRoute
+  '/help': typeof HelpRoute
   '/how-it-works': typeof HowItWorksRoute
   '/inspections': typeof InspectionsRoute
   '/login': typeof LoginRoute
   '/messages': typeof MessagesRoute
   '/payments': typeof PaymentsRoute
+  '/pricing': typeof PricingRoute
+  '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/register': typeof RegisterRoute
   '/saved': typeof SavedRoute
+  '/settings': typeof SettingsRoute
+  '/terms': typeof TermsRoute
   '/admin/audit-logs': typeof AdminAuditLogsRoute
   '/admin/inspections': typeof AdminInspectionsRoute
   '/admin/payments': typeof AdminPaymentsRoute
@@ -405,6 +466,7 @@ export interface FileRoutesByFullPath {
   '/inspector/availability': typeof InspectorAvailabilityRoute
   '/inspector/dashboard': typeof InspectorDashboardRoute
   '/inspector/earnings': typeof InspectorEarningsRoute
+  '/inspector/messages': typeof InspectorMessagesRoute
   '/inspector/profile': typeof InspectorProfileRoute
   '/inspector/reports': typeof InspectorReportsRoute
   '/landlord/agents': typeof LandlordAgentsRoute
@@ -426,6 +488,7 @@ export interface FileRoutesByFullPath {
   '/agent/properties/new': typeof AgentPropertiesNewRoute
   '/inspector/inspections/$id': typeof InspectorInspectionsIdRoute
   '/landlord/agreements/$id': typeof LandlordAgreementsIdRoute
+  '/landlord/properties/$id': typeof LandlordPropertiesIdRoute
   '/landlord/properties/new': typeof LandlordPropertiesNewRoute
   '/admin/agreements/': typeof AdminAgreementsIndexRoute
   '/agent/agreements/': typeof AgentAgreementsIndexRoute
@@ -437,16 +500,23 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/contact': typeof ContactRoute
   '/dashboard': typeof DashboardRoute
+  '/faq': typeof FaqRoute
   '/forgot-password': typeof ForgotPasswordRoute
+  '/help': typeof HelpRoute
   '/how-it-works': typeof HowItWorksRoute
   '/inspections': typeof InspectionsRoute
   '/login': typeof LoginRoute
   '/messages': typeof MessagesRoute
   '/payments': typeof PaymentsRoute
+  '/pricing': typeof PricingRoute
+  '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/register': typeof RegisterRoute
   '/saved': typeof SavedRoute
+  '/settings': typeof SettingsRoute
+  '/terms': typeof TermsRoute
   '/admin/audit-logs': typeof AdminAuditLogsRoute
   '/admin/inspections': typeof AdminInspectionsRoute
   '/admin/payments': typeof AdminPaymentsRoute
@@ -467,6 +537,7 @@ export interface FileRoutesByTo {
   '/inspector/availability': typeof InspectorAvailabilityRoute
   '/inspector/dashboard': typeof InspectorDashboardRoute
   '/inspector/earnings': typeof InspectorEarningsRoute
+  '/inspector/messages': typeof InspectorMessagesRoute
   '/inspector/profile': typeof InspectorProfileRoute
   '/inspector/reports': typeof InspectorReportsRoute
   '/landlord/agents': typeof LandlordAgentsRoute
@@ -488,6 +559,7 @@ export interface FileRoutesByTo {
   '/agent/properties/new': typeof AgentPropertiesNewRoute
   '/inspector/inspections/$id': typeof InspectorInspectionsIdRoute
   '/landlord/agreements/$id': typeof LandlordAgreementsIdRoute
+  '/landlord/properties/$id': typeof LandlordPropertiesIdRoute
   '/landlord/properties/new': typeof LandlordPropertiesNewRoute
   '/admin/agreements': typeof AdminAgreementsIndexRoute
   '/agent/agreements': typeof AgentAgreementsIndexRoute
@@ -500,16 +572,23 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/contact': typeof ContactRoute
   '/dashboard': typeof DashboardRoute
+  '/faq': typeof FaqRoute
   '/forgot-password': typeof ForgotPasswordRoute
+  '/help': typeof HelpRoute
   '/how-it-works': typeof HowItWorksRoute
   '/inspections': typeof InspectionsRoute
   '/login': typeof LoginRoute
   '/messages': typeof MessagesRoute
   '/payments': typeof PaymentsRoute
+  '/pricing': typeof PricingRoute
+  '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/register': typeof RegisterRoute
   '/saved': typeof SavedRoute
+  '/settings': typeof SettingsRoute
+  '/terms': typeof TermsRoute
   '/admin/audit-logs': typeof AdminAuditLogsRoute
   '/admin/inspections': typeof AdminInspectionsRoute
   '/admin/payments': typeof AdminPaymentsRoute
@@ -530,6 +609,7 @@ export interface FileRoutesById {
   '/inspector/availability': typeof InspectorAvailabilityRoute
   '/inspector/dashboard': typeof InspectorDashboardRoute
   '/inspector/earnings': typeof InspectorEarningsRoute
+  '/inspector/messages': typeof InspectorMessagesRoute
   '/inspector/profile': typeof InspectorProfileRoute
   '/inspector/reports': typeof InspectorReportsRoute
   '/landlord/agents': typeof LandlordAgentsRoute
@@ -551,6 +631,7 @@ export interface FileRoutesById {
   '/agent/properties/new': typeof AgentPropertiesNewRoute
   '/inspector/inspections/$id': typeof InspectorInspectionsIdRoute
   '/landlord/agreements/$id': typeof LandlordAgreementsIdRoute
+  '/landlord/properties/$id': typeof LandlordPropertiesIdRoute
   '/landlord/properties/new': typeof LandlordPropertiesNewRoute
   '/admin/agreements/': typeof AdminAgreementsIndexRoute
   '/agent/agreements/': typeof AgentAgreementsIndexRoute
@@ -564,16 +645,23 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/about'
+    | '/contact'
     | '/dashboard'
+    | '/faq'
     | '/forgot-password'
+    | '/help'
     | '/how-it-works'
     | '/inspections'
     | '/login'
     | '/messages'
     | '/payments'
+    | '/pricing'
+    | '/privacy'
     | '/profile'
     | '/register'
     | '/saved'
+    | '/settings'
+    | '/terms'
     | '/admin/audit-logs'
     | '/admin/inspections'
     | '/admin/payments'
@@ -594,6 +682,7 @@ export interface FileRouteTypes {
     | '/inspector/availability'
     | '/inspector/dashboard'
     | '/inspector/earnings'
+    | '/inspector/messages'
     | '/inspector/profile'
     | '/inspector/reports'
     | '/landlord/agents'
@@ -615,6 +704,7 @@ export interface FileRouteTypes {
     | '/agent/properties/new'
     | '/inspector/inspections/$id'
     | '/landlord/agreements/$id'
+    | '/landlord/properties/$id'
     | '/landlord/properties/new'
     | '/admin/agreements/'
     | '/agent/agreements/'
@@ -626,16 +716,23 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/about'
+    | '/contact'
     | '/dashboard'
+    | '/faq'
     | '/forgot-password'
+    | '/help'
     | '/how-it-works'
     | '/inspections'
     | '/login'
     | '/messages'
     | '/payments'
+    | '/pricing'
+    | '/privacy'
     | '/profile'
     | '/register'
     | '/saved'
+    | '/settings'
+    | '/terms'
     | '/admin/audit-logs'
     | '/admin/inspections'
     | '/admin/payments'
@@ -656,6 +753,7 @@ export interface FileRouteTypes {
     | '/inspector/availability'
     | '/inspector/dashboard'
     | '/inspector/earnings'
+    | '/inspector/messages'
     | '/inspector/profile'
     | '/inspector/reports'
     | '/landlord/agents'
@@ -677,6 +775,7 @@ export interface FileRouteTypes {
     | '/agent/properties/new'
     | '/inspector/inspections/$id'
     | '/landlord/agreements/$id'
+    | '/landlord/properties/$id'
     | '/landlord/properties/new'
     | '/admin/agreements'
     | '/agent/agreements'
@@ -688,16 +787,23 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/about'
+    | '/contact'
     | '/dashboard'
+    | '/faq'
     | '/forgot-password'
+    | '/help'
     | '/how-it-works'
     | '/inspections'
     | '/login'
     | '/messages'
     | '/payments'
+    | '/pricing'
+    | '/privacy'
     | '/profile'
     | '/register'
     | '/saved'
+    | '/settings'
+    | '/terms'
     | '/admin/audit-logs'
     | '/admin/inspections'
     | '/admin/payments'
@@ -718,6 +824,7 @@ export interface FileRouteTypes {
     | '/inspector/availability'
     | '/inspector/dashboard'
     | '/inspector/earnings'
+    | '/inspector/messages'
     | '/inspector/profile'
     | '/inspector/reports'
     | '/landlord/agents'
@@ -739,6 +846,7 @@ export interface FileRouteTypes {
     | '/agent/properties/new'
     | '/inspector/inspections/$id'
     | '/landlord/agreements/$id'
+    | '/landlord/properties/$id'
     | '/landlord/properties/new'
     | '/admin/agreements/'
     | '/agent/agreements/'
@@ -751,16 +859,23 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AboutRoute: typeof AboutRoute
+  ContactRoute: typeof ContactRoute
   DashboardRoute: typeof DashboardRoute
+  FaqRoute: typeof FaqRoute
   ForgotPasswordRoute: typeof ForgotPasswordRoute
+  HelpRoute: typeof HelpRoute
   HowItWorksRoute: typeof HowItWorksRoute
   InspectionsRoute: typeof InspectionsRoute
   LoginRoute: typeof LoginRoute
   MessagesRoute: typeof MessagesRoute
   PaymentsRoute: typeof PaymentsRoute
+  PricingRoute: typeof PricingRoute
+  PrivacyRoute: typeof PrivacyRoute
   ProfileRoute: typeof ProfileRoute
   RegisterRoute: typeof RegisterRoute
   SavedRoute: typeof SavedRoute
+  SettingsRoute: typeof SettingsRoute
+  TermsRoute: typeof TermsRoute
   AdminAuditLogsRoute: typeof AdminAuditLogsRoute
   AdminInspectionsRoute: typeof AdminInspectionsRoute
   AdminPaymentsRoute: typeof AdminPaymentsRoute
@@ -781,6 +896,7 @@ export interface RootRouteChildren {
   InspectorAvailabilityRoute: typeof InspectorAvailabilityRoute
   InspectorDashboardRoute: typeof InspectorDashboardRoute
   InspectorEarningsRoute: typeof InspectorEarningsRoute
+  InspectorMessagesRoute: typeof InspectorMessagesRoute
   InspectorProfileRoute: typeof InspectorProfileRoute
   InspectorReportsRoute: typeof InspectorReportsRoute
   LandlordAgentsRoute: typeof LandlordAgentsRoute
@@ -802,6 +918,7 @@ export interface RootRouteChildren {
   AgentPropertiesNewRoute: typeof AgentPropertiesNewRoute
   InspectorInspectionsIdRoute: typeof InspectorInspectionsIdRoute
   LandlordAgreementsIdRoute: typeof LandlordAgreementsIdRoute
+  LandlordPropertiesIdRoute: typeof LandlordPropertiesIdRoute
   LandlordPropertiesNewRoute: typeof LandlordPropertiesNewRoute
   AdminAgreementsIndexRoute: typeof AdminAgreementsIndexRoute
   AgentAgreementsIndexRoute: typeof AgentAgreementsIndexRoute
@@ -827,6 +944,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AboutRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/contact': {
+      id: '/contact'
+      path: '/contact'
+      fullPath: '/contact'
+      preLoaderRoute: typeof ContactRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/dashboard': {
       id: '/dashboard'
       path: '/dashboard'
@@ -834,11 +958,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/faq': {
+      id: '/faq'
+      path: '/faq'
+      fullPath: '/faq'
+      preLoaderRoute: typeof FaqRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/forgot-password': {
       id: '/forgot-password'
       path: '/forgot-password'
       fullPath: '/forgot-password'
       preLoaderRoute: typeof ForgotPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/help': {
+      id: '/help'
+      path: '/help'
+      fullPath: '/help'
+      preLoaderRoute: typeof HelpRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/how-it-works': {
@@ -876,6 +1014,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PaymentsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/pricing': {
+      id: '/pricing'
+      path: '/pricing'
+      fullPath: '/pricing'
+      preLoaderRoute: typeof PricingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/profile': {
       id: '/profile'
       path: '/profile'
@@ -895,6 +1047,20 @@ declare module '@tanstack/react-router' {
       path: '/saved'
       fullPath: '/saved'
       preLoaderRoute: typeof SavedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/': {
@@ -1049,6 +1215,13 @@ declare module '@tanstack/react-router' {
       path: '/inspector/earnings'
       fullPath: '/inspector/earnings'
       preLoaderRoute: typeof InspectorEarningsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/inspector/messages': {
+      id: '/inspector/messages'
+      path: '/inspector/messages'
+      fullPath: '/inspector/messages'
+      preLoaderRoute: typeof InspectorMessagesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/inspector/profile': {
@@ -1226,6 +1399,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LandlordPropertiesIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/landlord/properties/$id': {
+      id: '/landlord/properties/$id'
+      path: '/landlord/properties/$id'
+      fullPath: '/landlord/properties/$id'
+      preLoaderRoute: typeof LandlordPropertiesIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/landlord/properties/new': {
       id: '/landlord/properties/new'
       path: '/landlord/properties/new'
@@ -1239,16 +1419,23 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AboutRoute: AboutRoute,
+  ContactRoute: ContactRoute,
   DashboardRoute: DashboardRoute,
+  FaqRoute: FaqRoute,
   ForgotPasswordRoute: ForgotPasswordRoute,
+  HelpRoute: HelpRoute,
   HowItWorksRoute: HowItWorksRoute,
   InspectionsRoute: InspectionsRoute,
   LoginRoute: LoginRoute,
   MessagesRoute: MessagesRoute,
   PaymentsRoute: PaymentsRoute,
+  PricingRoute: PricingRoute,
+  PrivacyRoute: PrivacyRoute,
   ProfileRoute: ProfileRoute,
   RegisterRoute: RegisterRoute,
   SavedRoute: SavedRoute,
+  SettingsRoute: SettingsRoute,
+  TermsRoute: TermsRoute,
   AdminAuditLogsRoute: AdminAuditLogsRoute,
   AdminInspectionsRoute: AdminInspectionsRoute,
   AdminPaymentsRoute: AdminPaymentsRoute,
@@ -1269,6 +1456,7 @@ const rootRouteChildren: RootRouteChildren = {
   InspectorAvailabilityRoute: InspectorAvailabilityRoute,
   InspectorDashboardRoute: InspectorDashboardRoute,
   InspectorEarningsRoute: InspectorEarningsRoute,
+  InspectorMessagesRoute: InspectorMessagesRoute,
   InspectorProfileRoute: InspectorProfileRoute,
   InspectorReportsRoute: InspectorReportsRoute,
   LandlordAgentsRoute: LandlordAgentsRoute,
@@ -1290,6 +1478,7 @@ const rootRouteChildren: RootRouteChildren = {
   AgentPropertiesNewRoute: AgentPropertiesNewRoute,
   InspectorInspectionsIdRoute: InspectorInspectionsIdRoute,
   LandlordAgreementsIdRoute: LandlordAgreementsIdRoute,
+  LandlordPropertiesIdRoute: LandlordPropertiesIdRoute,
   LandlordPropertiesNewRoute: LandlordPropertiesNewRoute,
   AdminAgreementsIndexRoute: AdminAgreementsIndexRoute,
   AgentAgreementsIndexRoute: AgentAgreementsIndexRoute,

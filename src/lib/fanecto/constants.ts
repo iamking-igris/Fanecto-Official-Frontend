@@ -99,3 +99,15 @@ export const ROLE_LABEL: Record<Role, string> = {
   inspector: "Inspector",
   admin: "Admin",
 };
+
+/** Roommate post hostel amenities (not lifestyle preferences) */
+export const HOSTEL_AMENITIES = [
+  "Starlink",
+  "Solar pumping water",
+  "General generator",
+  "Fence & gated",
+  "Wardrobe",
+  "Cabinet",
+  "Light",
+  "Security",
+] as const;

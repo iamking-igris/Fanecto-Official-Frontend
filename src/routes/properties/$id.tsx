@@ -1,4 +1,5 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
+import { z } from "zod";
 import { Flag, Heart, MessageSquare, Share2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -25,7 +26,87 @@ import { useCurrentFanectoUser, useFanecto } from "@/lib/fanecto/store";
 import { INSPECTION_DISCLAIMER } from "@/lib/fanecto/types";
 import { cn } from "@/lib/utils";
 
-export const Route = createFileRoute("/properties/$id")({ component: PropertyDetailPage });
+
+function propertyBackFallback(role?: string) {
+  switch (role) {
+    case "inspector":
+      return "/inspector/inspections";
+    case "landlord":
+      return "/landlord/properties";
+    case "agent":
+      return "/agent/properties";
+    case "admin":
+      return "/admin/properties";
+    default:
+      return "/properties";
+  }
+}
+
+function PropertyBackLink() {
+  const navigate = useNavigate();
+  const router = useRouter();
+  const user = useCurrentFanectoUser();
+  const search = Route.useSearch();
+  const from = typeof search.from === "string" && search.from.startsWith("/") ? search.from : undefined;
+  const fallback = propertyBackFallback(user?.role);
+
+  const label =
+    from?.includes("/inspector/inspections")
+      ? "← Inspection"
+      : from?.includes("/inspections")
+        ? "← Inspection"
+        : from?.includes("/saved")
+          ? "← Saved"
+          : from?.includes("/landlord")
+            ? "← Listings"
+            : from?.includes("/agent")
+              ? "← Listings"
+              : from?.includes("/messages")
+                ? "← Messages"
+                : from === "/properties" || from?.startsWith("/properties?")
+                  ? "← All homes"
+                  : "← Back";
+
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        // 1) Explicit origin from entry point (most reliable across roles)
+        if (from) {
+          void navigate({ to: from });
+          return;
+        }
+        // 2) Real router/browser history (Find Home → Property → Back → All Homes)
+        try {
+          if (router.history.canGoBack?.()) {
+            router.history.back();
+            return;
+          }
+        } catch {
+          /* ignore */
+        }
+        if (typeof window !== "undefined" && window.history.length > 1) {
+          window.history.back();
+          return;
+        }
+        // 3) Role-safe fallback for direct URL entry
+        void navigate({ to: fallback });
+      }}
+      className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+    >
+      {label}
+    </button>
+  );
+}
+
+const propertySearchSchema = z.object({
+  from: z.string().optional(),
+});
+
+export const Route = createFileRoute("/properties/$id")({
+  component: PropertyDetailPage,
+  validateSearch: propertySearchSchema,
+});
 
 function PropertyDetailPage() {
   const { id } = Route.useParams();
@@ -63,11 +144,11 @@ function PropertyDetailPage() {
 
   if (!property) {
     return (
-      <SmartShell allow={["student", "seeker"]}>
+      <SmartShell allow={["student", "seeker", "landlord", "agent", "inspector", "admin"]}>
         <div className="mx-auto max-w-lg px-4 py-20">
           <h1 className="font-display text-3xl">Listing not found</h1>
-          <Button asChild className="mt-4">
-            <Link to="/properties">Back to homes</Link>
+          <Button className="mt-4" onClick={() => window.history.length > 1 ? window.history.back() : void navigate({ to: "/properties" })}>
+            Back
           </Button>
         </div>
       </SmartShell>
@@ -91,11 +172,9 @@ function PropertyDetailPage() {
   }
 
   return (
-    <SmartShell allow={["student", "seeker"]}>
+    <SmartShell allow={["student", "seeker", "landlord", "agent", "inspector", "admin"]}>
       <div className="mx-auto max-w-6xl px-4 py-6">
-        <Link to="/properties" className="text-sm text-muted-foreground hover:text-foreground">
-          ← All homes
-        </Link>
+        <PropertyBackLink />
 
         <div className="mt-4 lg:hidden">
           <button type="button" onClick={() => setLightbox(true)} className="block w-full overflow-hidden rounded-3xl">

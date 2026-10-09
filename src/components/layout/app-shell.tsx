@@ -88,6 +88,7 @@ const NAV: Record<Role, NavItem[]> = {
     { to: "/inspector/reports", label: "Reports", icon: FileText },
     { to: "/inspector/availability", label: "Availability", icon: ClipboardCheck },
     { to: "/inspector/earnings", label: "Earnings", icon: Banknote },
+    { to: "/inspector/messages", label: "Messages", icon: MessageSquare },
     { to: "/settings", label: "Settings", icon: Settings },
     { to: "/inspector/profile", label: "Profile", icon: UserRound },
   ],
